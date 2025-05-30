@@ -81,7 +81,17 @@ The application follows clean architecture principles with the following layers:
    flutter pub get
    ```
 
-3. Run the app:
+3. Create environment configuration:
+   Create a new file at `lib/core/config/env_config.dart` with the following content:
+
+   ```dart
+   class EnvConfig {
+     static const String supabaseUrl = 'https://kqgbftwsodpttpqgqnbh.supabase.co/rest/v1';
+     static const String supabaseApiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtxZ2JmdHdzb2RwdHRwcWdxbmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU5ODk5OTksImV4cCI6MjA2MTU2NTk5OX0.rwJSY4bJaNdB8jDn3YJJu_gKtznzm-dUKQb4OvRtP6c';
+   }
+   ```
+
+4. Run the app:
    ```bash
    flutter run
    ```
