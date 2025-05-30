@@ -12,6 +12,22 @@ Visits Tracker is a feature-rich mobile application that enables sales represent
 - Search and filter visits
 - Work seamlessly in both online and offline modes
 
+## 📱 App Preview
+
+<div align="center">
+  <img src="assets/screenshots/Screenshot_1748607943.png" alt="Visits List" width="200"/>
+  <img src="assets/screenshots/Screenshot_1748607948.png" alt="Add Visit" width="200"/>
+  <img src="assets/screenshots/Screenshot_1748607953.png" alt="Visit Details" width="200"/>
+  <br/>
+  <img src="assets/screenshots/Screenshot_1748607962.png" alt="Statistics" width="200"/>
+  <img src="assets/screenshots/Screenshot_1748607983.png" alt="Offline Mode" width="200"/>
+  <img src="assets/screenshots/Screenshot_1748607987.png" alt="Activities" width="200"/>
+</div>
+
+## 📥 Download APK
+
+You can download the latest APK version of the app from [here](https://drive.google.com/file/d/1qGuC5z4o9R3lZUpdyGt7GS-srOY8aLeP/view?usp=sharing).
+
 ## Key Features
 
 - **Clean Architecture**: Implemented using a scalable, maintainable architecture pattern
@@ -156,5 +172,3 @@ The project includes:
 5. Create a Pull Request
 
 ## License
-
-[Add your license information here]
