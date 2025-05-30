@@ -7,7 +7,7 @@ import 'package:visitstracker/features/customers/presentation/pages/customers_pa
 import 'package:visitstracker/features/profile/presentation/pages/profile_page.dart';
 import 'package:visitstracker/features/visits/presentation/pages/new_visit_page.dart';
 import 'package:visitstracker/features/visits/presentation/pages/visit_details_page.dart';
-import 'package:visitstracker/features/visits/presentation/pages/home_page.dart';
+import 'package:visitstracker/features/home/presentation/pages/home_page.dart';
 import 'package:visitstracker/features/visits/presentation/pages/visits_page.dart';
 
 // Global navigator key
