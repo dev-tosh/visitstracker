@@ -1,54 +1,48 @@
 import 'package:visitstracker/core/network/api_client.dart';
+import 'package:visitstracker/core/repositories/base_repository.dart';
+import 'package:visitstracker/core/services/cache_service.dart';
 import 'package:visitstracker/features/activities/domain/models/activity.dart';
 
-class ActivityRepository {
-  final ApiClient _apiClient;
-
-  ActivityRepository(this._apiClient);
+class ActivityRepository extends BaseRepository {
+  ActivityRepository(ApiClient apiClient, CacheService cacheService)
+      : super(apiClient, cacheService, '/activities', 'activities_cache');
 
   Future<List<Activity>> getActivities() async {
-    final response = await _apiClient.get('/activities');
-    return (response as List)
-        .map((json) => Activity.fromJson(json as Map<String, dynamic>))
-        .toList();
+    final response = await getAll();
+    return response.map((json) => Activity.fromJson(json)).toList();
   }
 
-  Future<Activity> createActivity(String description) async {
-    final response = await _apiClient.post(
-      '/activities',
-      {
-        'description': description,
-        'created_at': DateTime.now().toIso8601String(),
-      },
-    );
-
-    // If response is null (empty response), fetch the activity we just created
-    if (response == null) {
-      // Wait a moment for the activity to be created
-      await Future.delayed(const Duration(seconds: 1));
-
-      // Fetch the activity by description
-      final activities =
-          await _apiClient.get('/activities?description=eq.$description');
-      if (activities.isEmpty) {
-        throw Exception(
-            'Failed to create activity: Activity not found after creation');
+  Future<Activity> createActivity(Activity activity) async {
+    try {
+      final response = await create(activity.toJson());
+      if (response == null) {
+        // If the create returns null, fetch the latest activities and return the first one
+        final activities = await getActivities();
+        return activities.first;
       }
-      return Activity.fromJson(activities[0] as Map<String, dynamic>);
+      return Activity.fromJson(response);
+    } catch (e) {
+      // In offline mode, use the optimistic response
+      final optimisticResponse = {
+        'description': activity.description,
+        'created_at': activity.createdAt.toIso8601String(),
+        'id': DateTime.now().millisecondsSinceEpoch.toString(),
+      };
+      return Activity.fromJson(optimisticResponse);
     }
-
-    return Activity.fromJson(response as Map<String, dynamic>);
   }
 
-  Future<Activity> updateActivity(Activity activity) async {
-    final response = await _apiClient.patch(
-      '/activities/${activity.id}',
-      activity.toJson(),
-    );
-    return Activity.fromJson(response as Map<String, dynamic>);
+  Future<Activity> updateActivity(String id, Activity activity) async {
+    final response = await update(id, activity.toJsonForUpdate());
+    if (response == null) {
+      // If the update returns null, fetch the updated activity
+      final activities = await getActivities();
+      return activities.firstWhere((a) => a.id.toString() == id);
+    }
+    return Activity.fromJson(response);
   }
 
-  Future<void> deleteActivity(int id) async {
-    await _apiClient.delete('/activities/$id');
+  Future<void> deleteActivity(String id) async {
+    await delete(id);
   }
 }

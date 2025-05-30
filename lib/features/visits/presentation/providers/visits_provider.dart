@@ -1,33 +1,38 @@
 import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
+import 'package:visitstracker/core/services/snackbar_service.dart';
 import 'package:visitstracker/features/visits/data/repositories/visit_repository.dart';
-import 'package:visitstracker/features/visits/domain/entities/visit.dart';
+import 'package:visitstracker/features/visits/domain/models/visit.dart';
 
 class VisitsProvider extends ChangeNotifier {
   final VisitRepository _repository;
   List<Visit> _visits = [];
   bool _isLoading = false;
   String? _error;
+  BuildContext? _context;
 
   VisitsProvider(this._repository);
+
+  void setContext(BuildContext context) {
+    _context = context;
+  }
 
   List<Visit> get visits => _visits;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
   Future<void> loadVisits() async {
-    developer.log('Loading visits...');
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
       _visits = await _repository.getVisits();
-      _error = null;
-      developer.log('Successfully loaded ${_visits.length} visits');
+      _visits.sort((a, b) => b.visitDate.compareTo(a.visitDate));
+      developer.log('Loaded ${_visits.length} visits');
     } catch (e) {
       _error = e.toString();
-      developer.log('Error loading visits: $e', error: true);
+      developer.log('Error loading visits: $_error');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -35,40 +40,55 @@ class VisitsProvider extends ChangeNotifier {
   }
 
   Future<void> createVisit({
-    required String customerName,
+    required int customerId,
     required DateTime visitDate,
     required String status,
     required String location,
     String? notes,
     List<String>? activitiesDone,
   }) async {
-    developer.log('Creating new visit...');
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      await _repository.createVisit(
-        customerName: customerName,
+      final visit = Visit(
+        id: '', // Let Supabase generate the ID
+        customerId: customerId.toString(),
         visitDate: visitDate,
         status: status,
         location: location,
-        notes: notes,
-        activitiesDone: activitiesDone,
+        notes: notes ?? '',
+        activitiesDone: activitiesDone ?? [],
       );
-      developer.log('Visit created successfully, reloading visits...');
+      await _repository.createVisit(visit);
       await loadVisits();
+      if (_context != null) {
+        SnackbarService.show(
+          context: _context!,
+          message: 'Visit created successfully',
+          type: SnackBarType.success,
+        );
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
     } catch (e) {
       _error = e.toString();
-      developer.log('Error creating visit: $e', error: true);
+      developer.log('Error creating visit: $_error');
+      if (_context != null) {
+        SnackbarService.show(
+          context: _context!,
+          message: 'Failed to create visit: ${e.toString()}',
+          type: SnackBarType.error,
+        );
+      }
+    } finally {
+      _isLoading = false;
       notifyListeners();
-      rethrow;
     }
   }
 
   Future<void> updateVisit({
-    required int id,
-    String? customerName,
+    required String id,
     DateTime? visitDate,
     String? status,
     String? location,
@@ -80,34 +100,66 @@ class VisitsProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _repository.updateVisit(
+      final visit = Visit(
         id: id,
-        customerName: customerName,
-        visitDate: visitDate,
-        status: status,
-        location: location,
-        notes: notes,
-        activitiesDone: activitiesDone,
+        customerId: _visits.firstWhere((v) => v.id == id).customerId,
+        visitDate: visitDate ?? _visits.firstWhere((v) => v.id == id).visitDate,
+        status: status ?? _visits.firstWhere((v) => v.id == id).status,
+        location: location ?? _visits.firstWhere((v) => v.id == id).location,
+        notes: notes ?? _visits.firstWhere((v) => v.id == id).notes,
+        activitiesDone: activitiesDone ??
+            _visits.firstWhere((v) => v.id == id).activitiesDone,
       );
-      await loadVisits(); // Reload visits to get the updated one
+      await _repository.updateVisit(id, visit);
+      await loadVisits();
+      if (_context != null) {
+        SnackbarService.show(
+          context: _context!,
+          message: 'Visit updated successfully',
+          type: SnackBarType.success,
+        );
+      }
     } catch (e) {
       _error = e.toString();
+      developer.log('Error updating visit: $_error');
+      if (_context != null) {
+        SnackbarService.show(
+          context: _context!,
+          message: 'Failed to update visit: ${e.toString()}',
+          type: SnackBarType.error,
+        );
+      }
+    } finally {
+      _isLoading = false;
       notifyListeners();
-      rethrow;
     }
   }
 
-  Future<void> deleteVisit(int id) async {
+  Future<void> deleteVisit(String id) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
       await _repository.deleteVisit(id);
-      _visits.removeWhere((visit) => visit.id == id);
-      _error = null;
+      await loadVisits();
+      if (_context != null) {
+        SnackbarService.show(
+          context: _context!,
+          message: 'Visit deleted successfully',
+          type: SnackBarType.success,
+        );
+      }
     } catch (e) {
       _error = e.toString();
+      developer.log('Error deleting visit: $_error');
+      if (_context != null) {
+        SnackbarService.show(
+          context: _context!,
+          message: 'Failed to delete visit: ${e.toString()}',
+          type: SnackBarType.error,
+        );
+      }
     } finally {
       _isLoading = false;
       notifyListeners();

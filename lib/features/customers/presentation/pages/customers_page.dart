@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:visitstracker/core/services/alert_service.dart';
 import 'package:visitstracker/core/theme/text_styles.dart';
 import 'package:visitstracker/core/widgets/shimmer_card.dart';
 import 'package:visitstracker/features/customers/domain/models/customer.dart';
@@ -19,7 +20,9 @@ class _CustomersPageState extends State<CustomersPage> {
     super.initState();
     // Load customers when the page is first opened
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<CustomersProvider>().loadCustomers();
+      final provider = context.read<CustomersProvider>();
+      provider.setContext(context);
+      provider.loadCustomers();
     });
   }
 
@@ -188,66 +191,114 @@ class _CustomersPageState extends State<CustomersPage> {
 
   void _showAddCustomerDialog(BuildContext context) {
     final controller = TextEditingController();
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Add Customer', style: title3(context: context)),
-        content: Column(
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext bottomSheetContext) => Container(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(bottomSheetContext).viewInsets.bottom,
+        ),
+        decoration: BoxDecoration(
+          color: Theme.of(bottomSheetContext).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(
-              controller: controller,
-              decoration: const InputDecoration(
-                labelText: 'Customer Name',
-                hintText: 'Enter customer name',
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(bottomSheetContext).scaffoldBackgroundColor,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(20)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
               ),
-              autofocus: true,
+              child: Row(
+                children: [
+                  Text('Add Customer',
+                      style: title3(context: bottomSheetContext)),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(bottomSheetContext),
+                  ),
+                ],
+              ),
             ),
-            Consumer<CustomersProvider>(
-              builder: (context, provider, child) {
-                if (provider.isLoading) {
-                  return const Padding(
-                    padding: EdgeInsets.only(top: 16),
-                    child: CircularProgressIndicator(),
-                  );
-                }
-                if (provider.error != null) {
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      provider.error!,
-                      style: TextStyle(color: Colors.red),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: controller,
+                    decoration: const InputDecoration(
+                      labelText: 'Customer Name',
+                      hintText: 'Enter customer name',
+                      prefixIcon: Icon(Icons.person),
                     ),
-                  );
-                }
-                return const SizedBox.shrink();
-              },
+                    autofocus: true,
+                  ),
+                  const SizedBox(height: 16),
+                  Consumer<CustomersProvider>(
+                    builder: (context, provider, child) {
+                      if (provider.error != null) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: Text(
+                            provider.error!,
+                            style: TextStyle(color: Colors.red),
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(bottomSheetContext),
+                          child: const Text('Cancel'),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Consumer<CustomersProvider>(
+                          builder: (context, provider, child) {
+                            return ElevatedButton(
+                              onPressed: provider.isLoading
+                                  ? null
+                                  : () async {
+                                      if (controller.text.isNotEmpty) {
+                                        // Set the context before creating the customer
+                                        provider.setContext(bottomSheetContext);
+                                        await provider
+                                            .createCustomer(controller.text);
+                                        if (provider.error == null) {
+                                          Navigator.pop(bottomSheetContext);
+                                        }
+                                      }
+                                    },
+                              child: const Text('Add'),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          Consumer<CustomersProvider>(
-            builder: (context, provider, child) {
-              return ElevatedButton(
-                onPressed: provider.isLoading
-                    ? null
-                    : () async {
-                        if (controller.text.isNotEmpty) {
-                          await provider.createCustomer(controller.text);
-                          if (provider.error == null) {
-                            Navigator.pop(context);
-                          }
-                        }
-                      },
-                child: const Text('Add'),
-              );
-            },
-          ),
-        ],
       ),
     );
   }
@@ -266,67 +317,134 @@ class _CustomersPageState extends State<CustomersPage> {
 
   void _showEditCustomerDialog(BuildContext context, Customer customer) {
     final controller = TextEditingController(text: customer.name);
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Edit Customer', style: title3(context: context)),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            labelText: 'Customer Name',
-            hintText: 'Enter customer name',
-          ),
-          autofocus: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext bottomSheetContext) => Container(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(bottomSheetContext).viewInsets.bottom,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (controller.text.isNotEmpty) {
-                context.read<CustomersProvider>().updateCustomer(
-                      customer.copyWith(name: controller.text),
-                    );
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
+        decoration: BoxDecoration(
+          color: Theme.of(bottomSheetContext).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(bottomSheetContext).scaffoldBackgroundColor,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(20)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Text('Edit Customer',
+                      style: title3(context: bottomSheetContext)),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(bottomSheetContext),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: controller,
+                    decoration: const InputDecoration(
+                      labelText: 'Customer Name',
+                      hintText: 'Enter customer name',
+                      prefixIcon: Icon(Icons.person),
+                    ),
+                    autofocus: true,
+                  ),
+                  const SizedBox(height: 16),
+                  Consumer<CustomersProvider>(
+                    builder: (context, provider, child) {
+                      if (provider.error != null) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: Text(
+                            provider.error!,
+                            style: TextStyle(color: Colors.red),
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(bottomSheetContext),
+                          child: const Text('Cancel'),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Consumer<CustomersProvider>(
+                          builder: (context, provider, child) {
+                            return ElevatedButton(
+                              onPressed: provider.isLoading
+                                  ? null
+                                  : () async {
+                                      if (controller.text.isNotEmpty) {
+                                        // Set the context before updating the customer
+                                        provider.setContext(bottomSheetContext);
+                                        await provider.updateCustomer(
+                                          customer.copyWith(
+                                              name: controller.text),
+                                        );
+                                        if (provider.error == null) {
+                                          Navigator.pop(bottomSheetContext);
+                                        }
+                                      }
+                                    },
+                              child: const Text('Save'),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  void _showDeleteConfirmation(BuildContext context, Customer customer) {
-    showDialog(
+  void _showDeleteConfirmation(BuildContext context, Customer customer) async {
+    final provider = context.read<CustomersProvider>();
+    final shouldDelete = await AlertService.showDeleteConfirmation(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Delete Customer', style: title3(context: context)),
-        content: Text(
-          'Are you sure you want to delete ${customer.name}?',
-          style: body(context: context),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              context.read<CustomersProvider>().deleteCustomer(customer.id);
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      title: 'Delete Customer',
+      message: 'Are you sure you want to delete "${customer.name}"?',
     );
+
+    if (shouldDelete) {
+      provider.setContext(context);
+      if (customer.id != null) {
+        await provider.deleteCustomer(customer.id!);
+      }
+    }
   }
 
   String _formatDate(DateTime date) {

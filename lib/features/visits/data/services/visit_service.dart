@@ -1,5 +1,5 @@
 import 'package:visitstracker/features/visits/data/repositories/visit_repository.dart';
-import 'package:visitstracker/features/visits/domain/entities/visit.dart';
+import 'package:visitstracker/features/visits/domain/models/visit.dart';
 
 class VisitService {
   final VisitRepository _repository;
@@ -10,10 +10,6 @@ class VisitService {
     return _repository.getVisits();
   }
 
-  Future<Visit> getVisitById(int id) async {
-    return _repository.getVisitById(id);
-  }
-
   Future<void> createVisit({
     required String customerName,
     required DateTime visitDate,
@@ -22,13 +18,15 @@ class VisitService {
     String? notes,
     List<String>? activitiesDone,
   }) async {
-    await _repository.createVisit(
-      customerName: customerName,
+    final visit = Visit(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      customerId: customerName,
       visitDate: visitDate,
       status: status,
       location: location,
-      notes: notes,
-      activitiesDone: activitiesDone,
+      notes: notes ?? '',
+      activitiesDone: activitiesDone ?? [],
     );
+    await _repository.createVisit(visit);
   }
 }

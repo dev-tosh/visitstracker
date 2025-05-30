@@ -35,8 +35,13 @@ class ActivityProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final activity = await _repository.createActivity(description);
-      _activities.add(activity);
+      final activity = Activity(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        description: description,
+        createdAt: DateTime.now(),
+      );
+      final createdActivity = await _repository.createActivity(activity);
+      _activities.add(createdActivity);
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -51,7 +56,8 @@ class ActivityProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final updatedActivity = await _repository.updateActivity(activity);
+      final updatedActivity =
+          await _repository.updateActivity(activity.id.toString(), activity);
       final index = _activities.indexWhere((a) => a.id == activity.id);
       if (index != -1) {
         _activities[index] = updatedActivity;
@@ -70,7 +76,7 @@ class ActivityProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _repository.deleteActivity(id);
+      await _repository.deleteActivity(id.toString());
       _activities.removeWhere((activity) => activity.id == id);
     } catch (e) {
       _error = e.toString();

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:visitstracker/core/services/alert_service.dart';
 import 'package:visitstracker/core/theme/text_styles.dart';
 import 'package:visitstracker/core/widgets/shimmer_card.dart';
 import 'package:visitstracker/features/activities/domain/models/activity.dart';
@@ -18,7 +19,9 @@ class _ActivitiesPageState extends State<ActivitiesPage> {
     super.initState();
     // Load activities when the page is first built
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ActivitiesProvider>().loadActivities();
+      final provider = context.read<ActivitiesProvider>();
+      provider.setContext(context);
+      provider.loadActivities();
     });
   }
 
@@ -177,66 +180,114 @@ class _ActivitiesPageState extends State<ActivitiesPage> {
 
   void _showAddActivityDialog(BuildContext context) {
     final controller = TextEditingController();
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Add Activity', style: title3(context: context)),
-        content: Column(
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext bottomSheetContext) => Container(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(bottomSheetContext).viewInsets.bottom,
+        ),
+        decoration: BoxDecoration(
+          color: Theme.of(bottomSheetContext).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(
-              controller: controller,
-              decoration: const InputDecoration(
-                labelText: 'Activity Description',
-                hintText: 'Enter activity description',
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(bottomSheetContext).scaffoldBackgroundColor,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(20)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
               ),
-              autofocus: true,
+              child: Row(
+                children: [
+                  Text('Add Activity',
+                      style: title3(context: bottomSheetContext)),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(bottomSheetContext),
+                  ),
+                ],
+              ),
             ),
-            Consumer<ActivitiesProvider>(
-              builder: (context, provider, child) {
-                if (provider.isLoading) {
-                  return const Padding(
-                    padding: EdgeInsets.only(top: 16),
-                    child: CircularProgressIndicator(),
-                  );
-                }
-                if (provider.error != null) {
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      provider.error!,
-                      style: TextStyle(color: Colors.red),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: controller,
+                    decoration: const InputDecoration(
+                      labelText: 'Activity Description',
+                      hintText: 'Enter activity description',
+                      prefixIcon: Icon(Icons.task_alt),
                     ),
-                  );
-                }
-                return const SizedBox.shrink();
-              },
+                    autofocus: true,
+                  ),
+                  const SizedBox(height: 16),
+                  Consumer<ActivitiesProvider>(
+                    builder: (context, provider, child) {
+                      if (provider.error != null) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: Text(
+                            provider.error!,
+                            style: TextStyle(color: Colors.red),
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(bottomSheetContext),
+                          child: const Text('Cancel'),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Consumer<ActivitiesProvider>(
+                          builder: (context, provider, child) {
+                            return ElevatedButton(
+                              onPressed: provider.isLoading
+                                  ? null
+                                  : () async {
+                                      if (controller.text.isNotEmpty) {
+                                        // Set the context before creating the activity
+                                        provider.setContext(bottomSheetContext);
+                                        await provider
+                                            .createActivity(controller.text);
+                                        if (provider.error == null) {
+                                          Navigator.pop(bottomSheetContext);
+                                        }
+                                      }
+                                    },
+                              child: const Text('Add'),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          Consumer<ActivitiesProvider>(
-            builder: (context, provider, child) {
-              return ElevatedButton(
-                onPressed: provider.isLoading
-                    ? null
-                    : () async {
-                        if (controller.text.isNotEmpty) {
-                          await provider.createActivity(controller.text);
-                          if (provider.error == null) {
-                            Navigator.pop(context);
-                          }
-                        }
-                      },
-                child: const Text('Add'),
-              );
-            },
-          ),
-        ],
       ),
     );
   }
@@ -255,67 +306,135 @@ class _ActivitiesPageState extends State<ActivitiesPage> {
 
   void _showEditActivityDialog(BuildContext context, Activity activity) {
     final controller = TextEditingController(text: activity.description);
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Edit Activity', style: title3(context: context)),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            labelText: 'Activity Description',
-            hintText: 'Enter activity description',
-          ),
-          autofocus: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext bottomSheetContext) => Container(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(bottomSheetContext).viewInsets.bottom,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (controller.text.isNotEmpty) {
-                context.read<ActivitiesProvider>().updateActivity(
-                      activity.copyWith(description: controller.text),
-                    );
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
+        decoration: BoxDecoration(
+          color: Theme.of(bottomSheetContext).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(bottomSheetContext).scaffoldBackgroundColor,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(20)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Text('Edit Activity',
+                      style: title3(context: bottomSheetContext)),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(bottomSheetContext),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: controller,
+                    decoration: const InputDecoration(
+                      labelText: 'Activity Description',
+                      hintText: 'Enter activity description',
+                      prefixIcon: Icon(Icons.task_alt),
+                    ),
+                    autofocus: true,
+                  ),
+                  const SizedBox(height: 16),
+                  Consumer<ActivitiesProvider>(
+                    builder: (context, provider, child) {
+                      if (provider.error != null) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: Text(
+                            provider.error!,
+                            style: TextStyle(color: Colors.red),
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(bottomSheetContext),
+                          child: const Text('Cancel'),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Consumer<ActivitiesProvider>(
+                          builder: (context, provider, child) {
+                            return ElevatedButton(
+                              onPressed: provider.isLoading
+                                  ? null
+                                  : () async {
+                                      if (controller.text.isNotEmpty) {
+                                        // Set the context before updating the activity
+                                        provider.setContext(bottomSheetContext);
+                                        await provider.updateActivity(
+                                          activity.copyWith(
+                                            description: controller.text,
+                                          ),
+                                        );
+                                        if (provider.error == null) {
+                                          Navigator.pop(bottomSheetContext);
+                                        }
+                                      }
+                                    },
+                              child: const Text('Save'),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  void _showDeleteConfirmation(BuildContext context, Activity activity) {
-    showDialog(
+  void _showDeleteConfirmation(BuildContext context, Activity activity) async {
+    final provider = context.read<ActivitiesProvider>();
+    final shouldDelete = await AlertService.showDeleteConfirmation(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Delete Activity', style: title3(context: context)),
-        content: Text(
-          'Are you sure you want to delete "${activity.description}"?',
-          style: body(context: context),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              context.read<ActivitiesProvider>().deleteActivity(activity.id);
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      title: 'Delete Activity',
+      message: 'Are you sure you want to delete "${activity.description}"?',
     );
+
+    if (shouldDelete) {
+      provider.setContext(context);
+      if (activity.id != null) {
+        await provider.deleteActivity(activity.id!);
+      }
+    }
   }
 
   String _formatDate(DateTime date) {

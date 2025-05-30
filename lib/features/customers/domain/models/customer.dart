@@ -1,32 +1,42 @@
 class Customer {
-  final int id;
+  final String? id;
   final String name;
   final DateTime createdAt;
 
   Customer({
-    required this.id,
+    this.id,
     required this.name,
     required this.createdAt,
   });
 
   factory Customer.fromJson(Map<String, dynamic> json) {
     return Customer(
-      id: json['id'] as int,
+      id: json['id']?.toString(),
       name: json['name'] as String,
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }
 
   Map<String, dynamic> toJson() {
+    final json = {
+      'name': name,
+      'created_at': createdAt.toIso8601String(),
+    };
+    if (id != null) {
+      json['id'] = id.toString();
+    }
+    return json;
+  }
+
+  Map<String, dynamic> toJsonForUpdate() {
     return {
-      'id': id,
       'name': name,
       'created_at': createdAt.toIso8601String(),
     };
   }
 
   Customer copyWith({
-    int? id,
+    String? id,
     String? name,
     DateTime? createdAt,
   }) {

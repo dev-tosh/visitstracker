@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:visitstracker/core/services/alert_service.dart';
 import 'package:visitstracker/core/theme/text_styles.dart';
 import 'package:visitstracker/core/widgets/shimmer_card.dart';
-import 'package:visitstracker/features/visits/domain/entities/visit.dart';
+import 'package:visitstracker/features/visits/domain/models/visit.dart';
 import 'package:visitstracker/features/visits/presentation/providers/visits_provider.dart';
 import 'package:visitstracker/features/activities/presentation/providers/activities_provider.dart';
+import 'package:visitstracker/features/customers/presentation/providers/customers_provider.dart';
 
 class VisitsPage extends StatefulWidget {
   const VisitsPage({super.key});
@@ -20,7 +22,9 @@ class _VisitsPageState extends State<VisitsPage> {
     super.initState();
     // Load visits when the page is first opened
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<VisitsProvider>().loadVisits();
+      final provider = context.read<VisitsProvider>();
+      provider.setContext(context);
+      provider.loadVisits();
     });
   }
 
@@ -130,6 +134,7 @@ class _VisitsPageState extends State<VisitsPage> {
   Widget _buildVisitCard(BuildContext context, Visit visit) {
     return Card(
       elevation: 0,
+      margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
@@ -137,92 +142,190 @@ class _VisitsPageState extends State<VisitsPage> {
           width: 1,
         ),
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
-        leading: CircleAvatar(
-          backgroundColor: Colors.blue.withOpacity(0.1),
-          child: Icon(
-            Icons.event,
-            color: Colors.blue,
+      child: InkWell(
+        onTap: () {
+          // context.push('/visits/${visit.id}');
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.event,
+                      color: Colors.blue,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          visit.location,
+                          style: headline(context: context),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Date: ${_formatDate(visit.visitDate)}',
+                          style: body(context: context, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _buildStatusChip(context, visit.status),
+                ],
+              ),
+              if (visit.notes.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.note,
+                        size: 16,
+                        color: Colors.grey.shade600,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          visit.notes,
+                          style: body(
+                              context: context, color: Colors.grey.shade600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              if (visit.activitiesDone?.isNotEmpty ?? false) ...[
+                const SizedBox(height: 16),
+                Text(
+                  'Activities',
+                  style: body(context: context, color: Colors.grey),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: visit.activitiesDone!.map((activityId) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.check_circle,
+                            size: 16,
+                            color: Colors.green.shade600,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Activity #$activityId',
+                            style: body(
+                              context: context,
+                              color: Colors.green.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit),
+                    onPressed: () {
+                      _showEditVisitDialog(context, visit);
+                    },
+                    tooltip: 'Edit Visit',
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.delete,
+                      color: Colors.red,
+                    ),
+                    onPressed: () => _showDeleteConfirmation(context, visit),
+                    tooltip: 'Delete Visit',
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
-        title: Text(
-          visit.location,
-          style: headline(context: context),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Text(
-              'Date: ${_formatDate(visit.visitDate)}',
-              style: body(context: context, color: Colors.grey),
-            ),
-            const SizedBox(height: 4),
-            _buildStatusChip(context, visit.status),
-          ],
-        ),
-        trailing: PopupMenuButton<String>(
-          icon: const Icon(Icons.more_vert),
-          onSelected: (value) => _handleMenuAction(context, value, visit),
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'edit',
-              child: Row(
-                children: [
-                  Icon(Icons.edit, size: 20),
-                  SizedBox(width: 8),
-                  Text('Edit'),
-                ],
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'delete',
-              child: Row(
-                children: [
-                  Icon(Icons.delete, size: 20),
-                  SizedBox(width: 8),
-                  Text('Delete'),
-                ],
-              ),
-            ),
-          ],
-        ),
-        onTap: () {
-          context.push('/visits/${visit.id}');
-        },
       ),
     );
   }
 
   Widget _buildStatusChip(BuildContext context, String status) {
     Color color;
+    IconData icon;
     switch (status.toLowerCase()) {
       case 'completed':
         color = Colors.green;
+        icon = Icons.check_circle;
         break;
       case 'pending':
         color = Colors.orange;
+        icon = Icons.schedule;
         break;
       case 'cancelled':
         color = Colors.red;
+        icon = Icons.cancel;
         break;
       default:
         color = Colors.grey;
+        icon = Icons.help;
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
       ),
-      child: Text(
-        status,
-        style: body(
-          context: context,
-          color: color,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 16,
+            color: color,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            status,
+            style: body(
+              context: context,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -230,7 +333,7 @@ class _VisitsPageState extends State<VisitsPage> {
   void _handleMenuAction(BuildContext context, String value, Visit visit) {
     switch (value) {
       case 'edit':
-        // TODO: Implement edit visit
+        _showEditVisitDialog(context, visit);
         break;
       case 'delete':
         _showDeleteConfirmation(context, visit);
@@ -238,244 +341,644 @@ class _VisitsPageState extends State<VisitsPage> {
     }
   }
 
-  void _showDeleteConfirmation(BuildContext context, Visit visit) {
-    showDialog(
+  void _showDeleteConfirmation(BuildContext context, Visit visit) async {
+    final provider = context.read<VisitsProvider>();
+    final shouldDelete = await AlertService.showDeleteConfirmation(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Delete Visit', style: title3(context: context)),
-        content: Text(
-          'Are you sure you want to delete this visit?',
-          style: body(context: context),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                await context.read<VisitsProvider>().deleteVisit(visit.id);
-                Navigator.pop(context);
-              } catch (e) {
-                // Error is already handled by the provider
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
+      title: 'Delete Visit',
+      message:
+          'Are you sure you want to delete this visit to ${visit.location}?',
+    );
+
+    if (shouldDelete) {
+      provider.setContext(context);
+      await provider.deleteVisit(visit.id);
+    }
+  }
+
+  Widget _buildShimmerOverlay(BuildContext context) {
+    return Container(
+      color: Colors.black.withOpacity(0.1),
+      child: Column(
+        children: [
+          Container(
+            height: 56,
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: const Text('Delete'),
+          ),
+          Container(
+            height: 56,
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          Container(
+            height: 100,
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          Container(
+            height: 56,
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          Container(
+            height: 56,
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
         ],
       ),
     );
   }
 
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
-  }
-
   void _showAddVisitDialog(BuildContext context) {
-    final customerController = TextEditingController();
     final locationController = TextEditingController();
     final notesController = TextEditingController();
     DateTime selectedDate = DateTime.now();
     String selectedStatus = 'Pending';
     List<String> selectedActivities = [];
+    int? selectedCustomerId;
 
-    showDialog(
+    // Load customers and activities when dialog opens
+    final customersProvider = context.read<CustomersProvider>();
+    final activitiesProvider = context.read<ActivitiesProvider>();
+    customersProvider.loadCustomers();
+    activitiesProvider.loadActivities();
+
+    showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: Text('Add Visit', style: title3(context: context)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: customerController,
-                  decoration: const InputDecoration(
-                    labelText: 'Customer Name',
-                    hintText: 'Enter customer name',
-                    prefixIcon: Icon(Icons.person),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: locationController,
-                  decoration: const InputDecoration(
-                    labelText: 'Location',
-                    hintText: 'Enter visit location',
-                    prefixIcon: Icon(Icons.location_on),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: notesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Notes',
-                    hintText: 'Enter visit notes (optional)',
-                    prefixIcon: Icon(Icons.note),
-                  ),
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Date: ${_formatDate(selectedDate)}',
-                        style: body(context: context),
-                      ),
-                    ),
-                    TextButton.icon(
-                      onPressed: () async {
-                        final date = await showDatePicker(
-                          context: context,
-                          initialDate: selectedDate,
-                          firstDate: DateTime.now()
-                              .subtract(const Duration(days: 365)),
-                          lastDate:
-                              DateTime.now().add(const Duration(days: 365)),
-                        );
-                        if (date != null) {
-                          setState(() => selectedDate = date);
-                        }
-                      },
-                      icon: const Icon(Icons.calendar_today),
-                      label: const Text('Change'),
+        builder: (context, setState) => Container(
+          height: MediaQuery.of(context).size.height * 0.9,
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(20)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, -2),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: selectedStatus,
-                  decoration: const InputDecoration(
-                    labelText: 'Status',
-                    prefixIcon: Icon(Icons.flag),
-                  ),
-                  items: ['Pending', 'Completed', 'Cancelled']
-                      .map((status) => DropdownMenuItem(
-                            value: status,
-                            child: Text(status),
-                          ))
-                      .toList(),
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() => selectedStatus = value);
-                    }
-                  },
+                child: Row(
+                  children: [
+                    Text('Add Visit', style: title3(context: context)),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                Consumer<ActivitiesProvider>(
-                  builder: (context, activitiesProvider, child) {
-                    if (activitiesProvider.isLoading) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    if (activitiesProvider.error != null) {
-                      return Text(
-                        'Error loading activities: ${activitiesProvider.error}',
-                        style: TextStyle(color: Colors.red),
-                      );
-                    }
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Activities', style: body(context: context)),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          children:
-                              activitiesProvider.activities.map((activity) {
-                            final isSelected = selectedActivities
-                                .contains(activity.id.toString());
-                            return FilterChip(
-                              label: Text(activity.description),
-                              selected: isSelected,
-                              onSelected: (selected) {
-                                setState(() {
-                                  if (selected) {
-                                    selectedActivities
-                                        .add(activity.id.toString());
-                                  } else {
-                                    selectedActivities
-                                        .remove(activity.id.toString());
-                                  }
-                                });
-                              },
-                            );
-                          }).toList(),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-                Consumer<VisitsProvider>(
-                  builder: (context, provider, child) {
-                    if (provider.isLoading) {
-                      return const Padding(
-                        padding: EdgeInsets.only(top: 16),
-                        child: Center(child: CircularProgressIndicator()),
-                      );
-                    }
-                    if (provider.error != null) {
-                      return Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          provider.error!,
-                          style: TextStyle(color: Colors.red),
-                        ),
-                      );
-                    }
-                    return const SizedBox.shrink();
-                  },
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            Consumer<VisitsProvider>(
-              builder: (context, provider, child) {
-                return ElevatedButton(
-                  onPressed: provider.isLoading
-                      ? null
-                      : () async {
-                          if (customerController.text.isNotEmpty &&
-                              locationController.text.isNotEmpty) {
-                            try {
-                              await provider.createVisit(
-                                customerName: customerController.text,
-                                visitDate: selectedDate,
-                                status: selectedStatus,
-                                location: locationController.text,
-                                notes: notesController.text.isNotEmpty
-                                    ? notesController.text
-                                    : null,
-                                activitiesDone: selectedActivities.isNotEmpty
-                                    ? selectedActivities
-                                    : null,
-                              );
-                              if (provider.error == null) {
-                                Navigator.pop(context);
+              ),
+              Expanded(
+                child: Stack(
+                  children: [
+                    SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Consumer<CustomersProvider>(
+                            builder: (context, customersProvider, child) {
+                              if (customersProvider.isLoading) {
+                                return const Center(
+                                    child: CircularProgressIndicator());
                               }
-                            } catch (e) {
-                              // Error is already handled by the provider
-                            }
-                          }
+                              if (customersProvider.error != null) {
+                                return Text(
+                                  'Error loading customers: ${customersProvider.error}',
+                                  style: TextStyle(color: Colors.red),
+                                );
+                              }
+                              if (customersProvider.customers.isEmpty) {
+                                return Text(
+                                  'No customers available. Please add a customer first.',
+                                  style: TextStyle(color: Colors.red),
+                                );
+                              }
+                              return DropdownButtonFormField<String>(
+                                value: selectedCustomerId?.toString(),
+                                decoration: const InputDecoration(
+                                  labelText: 'Customer',
+                                  prefixIcon: Icon(Icons.person),
+                                ),
+                                items: customersProvider.customers
+                                    .map((customer) => DropdownMenuItem(
+                                          value: customer.id,
+                                          child: Text(customer.name),
+                                        ))
+                                    .toList(),
+                                onChanged: (value) {
+                                  if (value != null) {
+                                    setState(() =>
+                                        selectedCustomerId = int.parse(value));
+                                  }
+                                },
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          TextField(
+                            controller: locationController,
+                            decoration: const InputDecoration(
+                              labelText: 'Location',
+                              hintText: 'Enter visit location',
+                              prefixIcon: Icon(Icons.location_on),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          TextField(
+                            controller: notesController,
+                            decoration: const InputDecoration(
+                              labelText: 'Notes',
+                              hintText: 'Enter visit notes (optional)',
+                              prefixIcon: Icon(Icons.note),
+                            ),
+                            maxLines: 3,
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Date: ${_formatDate(selectedDate)}',
+                                  style: body(context: context),
+                                ),
+                              ),
+                              TextButton.icon(
+                                onPressed: () async {
+                                  final date = await showDatePicker(
+                                    context: context,
+                                    initialDate: selectedDate,
+                                    firstDate: DateTime.now()
+                                        .subtract(const Duration(days: 365)),
+                                    lastDate: DateTime.now()
+                                        .add(const Duration(days: 365)),
+                                  );
+                                  if (date != null) {
+                                    setState(() => selectedDate = date);
+                                  }
+                                },
+                                icon: const Icon(Icons.calendar_today),
+                                label: const Text('Change'),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          DropdownButtonFormField<String>(
+                            value: selectedStatus,
+                            decoration: const InputDecoration(
+                              labelText: 'Status',
+                              prefixIcon: Icon(Icons.flag),
+                            ),
+                            items: ['Pending', 'Completed', 'Cancelled']
+                                .map((status) => DropdownMenuItem(
+                                      value: status,
+                                      child: Text(status),
+                                    ))
+                                .toList(),
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() => selectedStatus = value);
+                              }
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          Consumer<ActivitiesProvider>(
+                            builder: (context, activitiesProvider, child) {
+                              if (activitiesProvider.isLoading) {
+                                return const Center(
+                                    child: CircularProgressIndicator());
+                              }
+                              if (activitiesProvider.error != null) {
+                                return Text(
+                                  'Error loading activities: ${activitiesProvider.error}',
+                                  style: TextStyle(color: Colors.red),
+                                );
+                              }
+                              if (activitiesProvider.activities.isEmpty) {
+                                return Text(
+                                  'No activities available. Please add some activities first.',
+                                  style: TextStyle(color: Colors.red),
+                                );
+                              }
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Activities',
+                                      style: body(context: context)),
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: activitiesProvider.activities
+                                        .map((activity) {
+                                      final isSelected = selectedActivities
+                                          .contains(activity.id.toString());
+                                      return FilterChip(
+                                        label: Text(activity.description),
+                                        selected: isSelected,
+                                        onSelected: (selected) {
+                                          setState(() {
+                                            if (selected) {
+                                              selectedActivities
+                                                  .add(activity.id.toString());
+                                            } else {
+                                              selectedActivities.remove(
+                                                  activity.id.toString());
+                                            }
+                                          });
+                                        },
+                                      );
+                                    }).toList(),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                          Consumer<VisitsProvider>(
+                            builder: (context, provider, child) {
+                              if (provider.error != null) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Text(
+                                    provider.error!,
+                                    style: TextStyle(color: Colors.red),
+                                  ),
+                                );
+                              }
+                              return const SizedBox.shrink();
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    Consumer<VisitsProvider>(
+                      builder: (context, provider, child) {
+                        if (provider.isLoading) {
+                          return _buildShimmerOverlay(context);
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Consumer<VisitsProvider>(
+                        builder: (context, provider, child) {
+                          return ElevatedButton(
+                            onPressed: provider.isLoading ||
+                                    selectedCustomerId == null ||
+                                    locationController.text.isEmpty
+                                ? null
+                                : () async {
+                                    try {
+                                      await provider.createVisit(
+                                        customerId: selectedCustomerId!,
+                                        visitDate: selectedDate,
+                                        status: selectedStatus,
+                                        location: locationController.text,
+                                        notes: notesController.text.isNotEmpty
+                                            ? notesController.text
+                                            : null,
+                                        activitiesDone:
+                                            selectedActivities.isNotEmpty
+                                                ? selectedActivities
+                                                : null,
+                                      );
+                                      if (provider.error == null) {
+                                        if (context.mounted) {
+                                          Navigator.pop(context);
+                                        }
+                                      }
+                                    } catch (e) {
+                                      // Error is already handled by the provider
+                                    }
+                                  },
+                            child: const Text('Add'),
+                          );
                         },
-                  child: const Text('Add'),
-                );
-              },
-            ),
-          ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  void _showEditVisitDialog(BuildContext context, Visit visit) {
+    final locationController = TextEditingController(text: visit.location);
+    final notesController = TextEditingController(text: visit.notes);
+    DateTime selectedDate = visit.visitDate;
+    String selectedStatus = visit.status;
+    List<String> selectedActivities = visit.activitiesDone ?? [];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => Container(
+          height: MediaQuery.of(context).size.height * 0.9,
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(20)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Text('Edit Visit', style: title3(context: context)),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Stack(
+                  children: [
+                    SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextField(
+                            controller: locationController,
+                            decoration: const InputDecoration(
+                              labelText: 'Location',
+                              hintText: 'Enter visit location',
+                              prefixIcon: Icon(Icons.location_on),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          TextField(
+                            controller: notesController,
+                            decoration: const InputDecoration(
+                              labelText: 'Notes',
+                              hintText: 'Enter visit notes (optional)',
+                              prefixIcon: Icon(Icons.note),
+                            ),
+                            maxLines: 3,
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Date: ${_formatDate(selectedDate)}',
+                                  style: body(context: context),
+                                ),
+                              ),
+                              TextButton.icon(
+                                onPressed: () async {
+                                  final date = await showDatePicker(
+                                    context: context,
+                                    initialDate: selectedDate,
+                                    firstDate: DateTime.now()
+                                        .subtract(const Duration(days: 365)),
+                                    lastDate: DateTime.now()
+                                        .add(const Duration(days: 365)),
+                                  );
+                                  if (date != null) {
+                                    setState(() => selectedDate = date);
+                                  }
+                                },
+                                icon: const Icon(Icons.calendar_today),
+                                label: const Text('Change'),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          DropdownButtonFormField<String>(
+                            value: selectedStatus,
+                            decoration: const InputDecoration(
+                              labelText: 'Status',
+                              prefixIcon: Icon(Icons.flag),
+                            ),
+                            items: ['Pending', 'Completed', 'Cancelled']
+                                .map((status) => DropdownMenuItem(
+                                      value: status,
+                                      child: Text(status),
+                                    ))
+                                .toList(),
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() => selectedStatus = value);
+                              }
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          Consumer<ActivitiesProvider>(
+                            builder: (context, activitiesProvider, child) {
+                              if (activitiesProvider.isLoading) {
+                                return const Center(
+                                    child: CircularProgressIndicator());
+                              }
+                              if (activitiesProvider.error != null) {
+                                return Text(
+                                  'Error loading activities: ${activitiesProvider.error}',
+                                  style: TextStyle(color: Colors.red),
+                                );
+                              }
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Activities',
+                                      style: body(context: context)),
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 8,
+                                    children: activitiesProvider.activities
+                                        .map((activity) {
+                                      final isSelected = selectedActivities
+                                          .contains(activity.id.toString());
+                                      return FilterChip(
+                                        label: Text(activity.description),
+                                        selected: isSelected,
+                                        onSelected: (selected) {
+                                          setState(() {
+                                            if (selected) {
+                                              selectedActivities
+                                                  .add(activity.id.toString());
+                                            } else {
+                                              selectedActivities.remove(
+                                                  activity.id.toString());
+                                            }
+                                          });
+                                        },
+                                      );
+                                    }).toList(),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                          Consumer<VisitsProvider>(
+                            builder: (context, provider, child) {
+                              if (provider.error != null) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Text(
+                                    provider.error!,
+                                    style: TextStyle(color: Colors.red),
+                                  ),
+                                );
+                              }
+                              return const SizedBox.shrink();
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    Consumer<VisitsProvider>(
+                      builder: (context, provider, child) {
+                        if (provider.isLoading) {
+                          return _buildShimmerOverlay(context);
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Consumer<VisitsProvider>(
+                        builder: (context, provider, child) {
+                          return ElevatedButton(
+                            onPressed: provider.isLoading
+                                ? null
+                                : () async {
+                                    if (locationController.text.isNotEmpty) {
+                                      try {
+                                        await provider.updateVisit(
+                                          id: visit.id,
+                                          visitDate: selectedDate,
+                                          status: selectedStatus,
+                                          location: locationController.text,
+                                          notes: notesController.text.isNotEmpty
+                                              ? notesController.text
+                                              : null,
+                                          activitiesDone:
+                                              selectedActivities.isNotEmpty
+                                                  ? selectedActivities
+                                                  : null,
+                                        );
+                                        if (provider.error == null) {
+                                          Navigator.pop(context);
+                                        }
+                                      } catch (e) {
+                                        // Error is already handled by the provider
+                                      }
+                                    }
+                                  },
+                            child: const Text('Save'),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
   }
 }
