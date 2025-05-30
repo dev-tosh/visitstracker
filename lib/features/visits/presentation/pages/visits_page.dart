@@ -479,7 +479,7 @@ class _VisitsPageState extends State<VisitsPage> {
                                 );
                               }
                               if (customersProvider.customers.isEmpty) {
-                                return Text(
+                                return const Text(
                                   'No customers available. Please add a customer first.',
                                   style: TextStyle(color: Colors.red),
                                 );
