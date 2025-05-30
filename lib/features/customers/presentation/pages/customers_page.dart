@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:shimmer/shimmer.dart';
 import 'package:visitstracker/core/theme/text_styles.dart';
+import 'package:visitstracker/core/widgets/shimmer_card.dart';
 import 'package:visitstracker/features/customers/domain/models/customer.dart';
 import 'package:visitstracker/features/customers/presentation/providers/customers_provider.dart';
 
@@ -44,7 +44,7 @@ class _CustomersPageState extends State<CustomersPage> {
           if (provider.isLoading) {
             return ListView.builder(
               padding: const EdgeInsets.all(16),
-              itemCount: 5,
+              itemCount: 10,
               itemBuilder: (context, index) => _buildShimmerCard(context),
             );
           }
@@ -112,57 +112,15 @@ class _CustomersPageState extends State<CustomersPage> {
   }
 
   Widget _buildShimmerCard(BuildContext context) {
-    return Shimmer.fromColors(
-      baseColor: Colors.grey.shade300,
-      highlightColor: Colors.grey.shade100,
-      child: Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(
-            color: Colors.grey.shade200,
-            width: 1,
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      width: 120,
-                      height: 16,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+    return ShimmerCard(
+      leading: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Colors.grey.shade800
+              : Colors.white,
+          borderRadius: BorderRadius.circular(24),
         ),
       ),
     );
@@ -234,29 +192,60 @@ class _CustomersPageState extends State<CustomersPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Add Customer', style: title3(context: context)),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            labelText: 'Customer Name',
-            hintText: 'Enter customer name',
-          ),
-          autofocus: true,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                labelText: 'Customer Name',
+                hintText: 'Enter customer name',
+              ),
+              autofocus: true,
+            ),
+            Consumer<CustomersProvider>(
+              builder: (context, provider, child) {
+                if (provider.isLoading) {
+                  return const Padding(
+                    padding: EdgeInsets.only(top: 16),
+                    child: CircularProgressIndicator(),
+                  );
+                }
+                if (provider.error != null) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      provider.error!,
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
-            onPressed: () {
-              if (controller.text.isNotEmpty) {
-                context
-                    .read<CustomersProvider>()
-                    .createCustomer(controller.text);
-                Navigator.pop(context);
-              }
+          Consumer<CustomersProvider>(
+            builder: (context, provider, child) {
+              return ElevatedButton(
+                onPressed: provider.isLoading
+                    ? null
+                    : () async {
+                        if (controller.text.isNotEmpty) {
+                          await provider.createCustomer(controller.text);
+                          if (provider.error == null) {
+                            Navigator.pop(context);
+                          }
+                        }
+                      },
+                child: const Text('Add'),
+              );
             },
-            child: const Text('Add'),
           ),
         ],
       ),

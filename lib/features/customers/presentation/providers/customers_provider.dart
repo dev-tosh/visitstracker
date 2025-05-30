@@ -1,16 +1,14 @@
-import 'package:flutter/foundation.dart';
-import 'package:visitstracker/features/customers/data/repositories/customer_repository.dart';
+import 'package:flutter/material.dart';
+import 'package:visitstracker/core/network/supabase_service.dart';
 import 'package:visitstracker/features/customers/domain/models/customer.dart';
 
 class CustomersProvider extends ChangeNotifier {
-  final CustomerRepository _repository;
+  final SupabaseService _supabaseService;
   List<Customer> _customers = [];
   bool _isLoading = false;
   String? _error;
 
-  CustomersProvider(this._repository) {
-    loadCustomers();
-  }
+  CustomersProvider(this._supabaseService);
 
   List<Customer> get customers => _customers;
   bool get isLoading => _isLoading;
@@ -22,7 +20,8 @@ class CustomersProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _customers = await _repository.getCustomers();
+      final data = await _supabaseService.getCustomers();
+      _customers = data.map((json) => Customer.fromJson(json)).toList();
       _error = null;
     } catch (e) {
       _error = e.toString();
@@ -33,41 +32,59 @@ class CustomersProvider extends ChangeNotifier {
   }
 
   Future<void> createCustomer(String name) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
     try {
-      final customer = await _repository.createCustomer(name);
+      final data = await _supabaseService.createCustomer(name);
+      final customer = Customer.fromJson(data);
       _customers.add(customer);
-      notifyListeners();
+      _error = null;
     } catch (e) {
       _error = e.toString();
+    } finally {
+      _isLoading = false;
       notifyListeners();
-      rethrow;
     }
   }
 
   Future<void> updateCustomer(Customer customer) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
     try {
-      final updatedCustomer = await _repository.updateCustomer(customer);
+      final data =
+          await _supabaseService.updateCustomer(customer.id, customer.name);
+      final updatedCustomer = Customer.fromJson(data);
       final index = _customers.indexWhere((c) => c.id == customer.id);
       if (index != -1) {
         _customers[index] = updatedCustomer;
-        notifyListeners();
       }
+      _error = null;
     } catch (e) {
       _error = e.toString();
+    } finally {
+      _isLoading = false;
       notifyListeners();
-      rethrow;
     }
   }
 
   Future<void> deleteCustomer(int id) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
     try {
-      await _repository.deleteCustomer(id);
-      _customers.removeWhere((c) => c.id == id);
-      notifyListeners();
+      await _supabaseService.deleteCustomer(id);
+      _customers.removeWhere((customer) => customer.id == id);
+      _error = null;
     } catch (e) {
       _error = e.toString();
+    } finally {
+      _isLoading = false;
       notifyListeners();
-      rethrow;
     }
   }
 }

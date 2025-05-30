@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
 import 'package:visitstracker/core/network/api_client.dart';
+import 'package:visitstracker/core/network/supabase_service.dart';
+import 'package:visitstracker/core/storage/storage_service.dart';
 import 'package:visitstracker/features/actions/data/repositories/action_repository.dart';
 import 'package:visitstracker/features/actions/presentation/providers/actions_provider.dart';
 import 'package:visitstracker/features/activities/data/repositories/activity_repository.dart';
@@ -11,25 +15,41 @@ import 'package:visitstracker/features/visits/data/repositories/visit_repository
 import 'package:visitstracker/features/visits/data/services/visit_service.dart';
 import 'package:visitstracker/features/visits/presentation/providers/visits_provider.dart';
 import 'package:visitstracker/core/routes/app_router.dart';
+import 'package:visitstracker/core/theme/theme_provider.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final prefs = await SharedPreferences.getInstance();
+  final storageService = StorageService(prefs);
+  final httpClient = http.Client();
+  final supabaseService = SupabaseService(httpClient);
+
   final apiClient = ApiClient();
   final actionRepository = ActionRepository();
   final activityRepository = ActivityRepository(apiClient);
-  final customerRepository = CustomerRepository(apiClient);
   final visitRepository = VisitRepository(apiClient);
   final visitService = VisitService(visitRepository);
 
   runApp(
     MultiProvider(
       providers: [
+        Provider<SupabaseService>.value(value: supabaseService),
         ChangeNotifierProvider(
-            create: (_) => ActionsProvider(actionRepository)),
+          create: (_) => ThemeProvider(storageService),
+        ),
         ChangeNotifierProvider(
-            create: (_) => ActivitiesProvider(activityRepository)),
+          create: (_) => ActionsProvider(actionRepository),
+        ),
         ChangeNotifierProvider(
-            create: (_) => CustomersProvider(customerRepository)),
-        ChangeNotifierProvider(create: (_) => VisitsProvider(visitService)),
+          create: (_) => ActivitiesProvider(activityRepository),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => CustomersProvider(supabaseService),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => VisitsProvider(visitRepository),
+        ),
       ],
       child: const MyApp(),
     ),
@@ -41,13 +61,18 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: 'Visits Tracker',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
-      ),
-      routerConfig: router,
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        return MaterialApp.router(
+          debugShowCheckedModeBanner: false,
+          title: 'Visits Tracker',
+          theme: ThemeData.light(useMaterial3: true),
+          darkTheme: ThemeData.dark(useMaterial3: true),
+          themeMode:
+              themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+          routerConfig: router,
+        );
+      },
     );
   }
 }

@@ -13,4 +13,22 @@ class VisitService {
   Future<Visit> getVisitById(int id) async {
     return _repository.getVisitById(id);
   }
+
+  Future<void> createVisit({
+    required String customerName,
+    required DateTime visitDate,
+    required String status,
+    required String location,
+    String? notes,
+    List<String>? activitiesDone,
+  }) async {
+    await _repository.createVisit(
+      customerName: customerName,
+      visitDate: visitDate,
+      status: status,
+      location: location,
+      notes: notes,
+      activitiesDone: activitiesDone,
+    );
+  }
 }

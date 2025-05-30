@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:visitstracker/core/storage/storage_service.dart';
 
 class ThemeProvider extends ChangeNotifier {
-  bool _isDarkMode = false;
+  final StorageService _storage;
+  bool _isDarkMode;
+
+  ThemeProvider(this._storage) : _isDarkMode = _storage.getThemeMode() ?? false;
 
   bool get isDarkMode => _isDarkMode;
 
   ThemeData get currentTheme => _isDarkMode ? _darkTheme : _lightTheme;
 
-  void toggleTheme() {
+  Future<void> toggleTheme() async {
     _isDarkMode = !_isDarkMode;
+    await _storage.setThemeMode(_isDarkMode);
     notifyListeners();
   }
 
